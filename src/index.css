@@ -1,0 +1,50 @@
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  background: #f0eee9;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar { display: none; }
+
+input, textarea, button, select { font-family: inherit; }
+button { cursor: pointer; border: none; background: none; padding: 0; }
+
+/* Leaflet overrides */
+.leaflet-container { background: #E8ECEA !important; }
+.pathly-marker, .pathly-daypill {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.leaflet-control-zoom { display: none; }
+
+/* Animations */
+@keyframes slideUp   { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes slideDown { from { transform: translateY(-16px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fadeIn    { from { opacity: 0; } to { opacity: 1; } }
+@keyframes spin      { to { transform: rotate(360deg); } }
+@keyframes pulse     { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes shimmer   { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+
+.anim-slideUp   { animation: slideUp   .28s cubic-bezier(.25,.46,.45,.94) both; }
+.anim-slideDown { animation: slideDown .22s cubic-bezier(.25,.46,.45,.94) both; }
+.anim-fadeIn    { animation: fadeIn    .20s ease both; }
+.anim-spin      { animation: spin 1s linear infinite; display: block; }
+.anim-pulse     { animation: pulse 1.6s ease-in-out infinite; }
+
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e4e4e4 50%, #f0f0f0 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 8px;
+}
