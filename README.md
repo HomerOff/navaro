@@ -4,7 +4,7 @@
 
 AI-powered trip planner. Type a city, pick your interests — get a full personalized itinerary with an interactive map, real photos, and walking routes in seconds.
 
-**Live:** [navaro-app.netlify.app](https://navaro-app.netlify.app)
+**Live:** [navaro-ai.netlify.app](https://navaro-ai.netlify.app)
 
 ---
 
