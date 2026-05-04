@@ -1,5 +1,5 @@
 // ── Pollinations ────────────────────────────────────────────────
-export const POLLINATIONS_CLIENT_ID  = 'pk_yNyOGutRnYEWF5T2';
+export const POLLINATIONS_CLIENT_ID  = 'pk_rz2izbsmPnCwIypP';
 export const POLLINATIONS_AUTH_URL   = 'https://enter.pollinations.ai/authorize';
 export const POLLINATIONS_API_URL    = 'https://gen.pollinations.ai/v1/chat/completions';
 export const POLLINATIONS_MODELS_URL = 'https://gen.pollinations.ai/v1/models';

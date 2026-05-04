@@ -10,7 +10,6 @@ import { Toast } from './components/Toast.jsx';
 import { Settings } from './components/Settings.jsx';
 import { ShareModal } from './components/ShareModal.jsx';
 import { AuthPromptModal } from './components/AuthPromptModal.jsx';
-import { ImageTest } from './components/ImageTest.jsx';
 import { extractShareId, downloadTripFromBlob, clearShareParam, importTripFromFile } from './services/share.js';
 
 function useIsDesktop() {
