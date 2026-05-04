@@ -1,42 +1,57 @@
 /**
  * Small reusable UI atoms — Card, CircBtn, PillTab, DayPill,
- * CategoryPill, BronzeBadge, Stars, Spinner, Skeleton.
+ * CategoryPill, BronzeBadge, Stars, Spinner, Skeleton,
+ * BottomBar, ConfirmDialog, DateBadge.
  */
+import { useState } from 'react';
 import { PA } from '../../tokens.js';
 import { Ic } from '../../icons.jsx';
+import { loremflickrUrl } from '../../services/ai.js';
 
 /* ── Card ──────────────────────────────── */
-export function Card({ children, style, padding = 16, radius = PA.rCard, onClick }) {
+export function Card({ children, style, padding = 16, radius = PA.rCard, onClick, selected, selectedColor }) {
   const base = {
     background: PA.card,
     borderRadius: radius,
     padding,
     boxShadow: '0 1px 2px rgba(15,23,42,0.04), 0 8px 24px rgba(15,23,42,0.05)',
+    border: selected ? `2px solid ${selectedColor ?? PA.blue}` : '2px solid transparent',
+    transition: 'border-color .15s',
     ...style,
   };
   if (onClick) {
     return (
-      <button onClick={onClick} style={{ all: 'unset', display: 'block', width: '100%', cursor: 'pointer' }}>
-        <div style={base}>{children}</div>
-      </button>
+      // Use div with role/tabIndex to avoid nested <button> issues
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onClick}
+        onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onClick(e)}
+        style={{ display: 'block', width: '100%', cursor: 'pointer', textAlign: 'left', ...base }}
+      >
+        {children}
+      </div>
     );
   }
   return <div style={base}>{children}</div>;
 }
 
 /* ── CircBtn ───────────────────────────── */
-export function CircBtn({ children, size = 42, style, shadow = true, onClick, title }) {
+export function CircBtn({ children, size = 42, style, shadow = true, onClick, title, disabled }) {
   return (
     <button
       onClick={onClick}
       title={title}
+      disabled={disabled}
       style={{
         width: size, height: size,
         borderRadius: '50%',
         background: '#fff',
         boxShadow: shadow ? '0 2px 8px rgba(15,23,42,0.08), 0 0 0 1px rgba(15,23,42,0.05)' : 'none',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: '#111', flexShrink: 0, border: 'none', cursor: 'pointer',
+        color: '#111', flexShrink: 0, border: 'none', cursor: disabled ? 'default' : 'pointer',
+        opacity: disabled ? 0.4 : 1,
+        transition: 'opacity .15s',
         ...style,
       }}
     >
@@ -180,7 +195,7 @@ export function Skeleton({ width, height, radius = 8, style }) {
 }
 
 /* ── BottomBar (home nav) ──────────────── */
-export function BottomBar({ onNewTrip, onFavorites, favoritesActive = false }) {
+export function BottomBar({ onNewTrip, onFavorites, onHome, favoritesActive = false, homeActive = false }) {
   return (
     <div style={{
       position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
@@ -196,9 +211,19 @@ export function BottomBar({ onNewTrip, onFavorites, favoritesActive = false }) {
         display: 'flex', alignItems: 'center', gap: 20,
         boxShadow: '0 8px 24px rgba(15,23,42,.10), 0 0 0 1px rgba(15,23,42,.04)',
       }}>
-        <div style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Ic.bag size={22} color={PA.blue} />
-        </div>
+        {/* Home button */}
+        <button
+          onClick={onHome}
+          style={{
+            all: 'unset', cursor: 'pointer',
+            width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          title="Home"
+        >
+          <Ic.home size={22} color={homeActive ? PA.blue : PA.muted} />
+        </button>
+
+        {/* New trip */}
         <button
           onClick={onNewTrip}
           style={{
@@ -210,16 +235,119 @@ export function BottomBar({ onNewTrip, onFavorites, favoritesActive = false }) {
         >
           <Ic.plus size={22} color="#fff" />
         </button>
+
+        {/* Favorites */}
         <button
           onClick={onFavorites}
           style={{
             all: 'unset', cursor: 'pointer',
             width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
+          title="Favorites"
         >
-          <Ic.bookmark size={22} color={favoritesActive ? PA.blue : PA.muted} />
+          <Ic.bookmark size={22} color={favoritesActive ? PA.blue : PA.muted} fill={favoritesActive ? PA.blue : 'none'} />
         </button>
       </div>
     </div>
+  );
+}
+
+/* ── ConfirmDialog ─────────────────────── */
+export function ConfirmDialog({ title, message, confirmLabel = 'Confirm', confirmColor = PA.red, onConfirm, onCancel }) {
+  return (
+    <div
+      className="anim-fadeIn"
+      style={{
+        position: 'fixed', inset: 0, zIndex: 3000,
+        background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '0 24px',
+      }}
+      onClick={e => { if (e.target === e.currentTarget) onCancel(); }}
+    >
+      <div
+        className="anim-slideUp"
+        style={{
+          width: '100%', maxWidth: 360,
+          background: '#fff', borderRadius: 24,
+          padding: '28px 24px 20px',
+          boxShadow: '0 24px 60px rgba(0,0,0,.18)',
+        }}
+      >
+        <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 10, color: PA.ink }}>{title}</div>
+        <div style={{ color: PA.muted, fontSize: 14.5, lineHeight: 1.55, marginBottom: 24 }}>{message}</div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1, padding: '12px', borderRadius: 9999,
+              fontWeight: 700, fontSize: 14, cursor: 'pointer',
+              background: PA.chip, color: PA.ink, border: 'none',
+            }}
+          >Cancel</button>
+          <button
+            onClick={onConfirm}
+            style={{
+              flex: 1, padding: '12px', borderRadius: 9999,
+              fontWeight: 700, fontSize: 14, cursor: 'pointer',
+              background: confirmColor, color: '#fff', border: 'none',
+            }}
+          >{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── DateBadge ─────────────────────────── */
+export function DateBadge({ dateRange }) {
+  if (!dateRange?.start) return null;
+  const fmt = d => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const sameDay = dateRange.end && dateRange.end === dateRange.start;
+  return (
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      background: PA.blueSoft, color: PA.blueDeep,
+      padding: '3px 10px', borderRadius: 9999,
+      fontSize: 12, fontWeight: 600,
+    }}>
+      <Ic.cal size={12} color={PA.blueDeep} />
+      {sameDay
+        ? fmt(dateRange.start)
+        : `${fmt(dateRange.start)}${dateRange.end ? ` – ${fmt(dateRange.end)}` : ''}`
+      }
+    </div>
+  );
+}
+
+/* ── ImgWithFallback ───────────────────── */
+// Images are resolved once at trip creation and saved to JSON.
+// Client-side fallback chain: src → loremflickr → pin icon.
+export function ImgWithFallback({ src, alt = '', style, fallbackColor = PA.chip, imgQuery }) {
+  const [currentSrc, setCurrentSrc] = useState(src);
+  const [errored, setErrored]       = useState(false);
+
+  if (errored) {
+    return (
+      <div style={{ ...style, background: fallbackColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Ic.pin size={24} color={PA.mutedSoft} />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={currentSrc}
+      alt={alt}
+      style={style}
+      loading="lazy"
+      onError={() => {
+        if (imgQuery && currentSrc !== loremflickrUrl(imgQuery, 400, 400)) {
+          setCurrentSrc(loremflickrUrl(imgQuery, 400, 400));
+        } else {
+          setErrored(true);
+        }
+      }}
+    />
   );
 }

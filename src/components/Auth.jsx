@@ -1,22 +1,10 @@
 import { PA } from '../tokens.js';
+import { Ic } from '../icons.jsx';
 import { PathlyLogo } from './ui/PathlyLogo.jsx';
 import { PathlyBg } from './ui/PathlyBg.jsx';
+import { buildAuthUrl } from '../services/authUrl.js';
 
-const CLIENT_ID = 'pk_TGZqJ6EuJoOGLFdu';
-
-export function buildAuthUrl() {
-  const redirectUri = window.location.origin + window.location.pathname;
-  const params = new URLSearchParams({
-    client_id: CLIENT_ID,
-    redirect_uri: redirectUri,
-    scope: 'usage',
-    expiry: '30',
-    state: Math.random().toString(36).slice(2),
-  });
-  return `https://enter.pollinations.ai/authorize?${params}`;
-}
-
-export function AuthScreen() {
+export function AuthScreen({ onGuest }) {
   return (
     <div style={{ minHeight: '100dvh', fontFamily: PA.font, position: 'relative', display: 'flex', flexDirection: 'column' }}>
       <PathlyBg tone="mint" />
@@ -47,16 +35,15 @@ export function AuthScreen() {
 
           {/* Steps */}
           {[
-            { emoji: '🔑', text: 'Free Pollinations account required' },
-            { emoji: '🗺',  text: 'AI builds personalized itineraries' },
-            { emoji: '🔒', text: 'Your key is stored only in this browser' },
+            { icon: <Ic.key   size={18} color={PA.ink} />, text: 'Free Pollinations account required' },
+            { icon: <Ic.map   size={18} color={PA.ink} />, text: 'AI builds personalized itineraries' },
+            { icon: <Ic.lock  size={18} color={PA.ink} />, text: 'Your key is stored only in this browser' },
           ].map((s, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
               <div style={{
                 width: 40, height: 40, borderRadius: 12, flexShrink: 0,
                 background: '#F4F5F2', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 20,
-              }}>{s.emoji}</div>
+              }}>{s.icon}</div>
               <div style={{ fontSize: 14, fontWeight: 600, color: PA.ink }}>{s.text}</div>
             </div>
           ))}
@@ -77,10 +64,33 @@ export function AuthScreen() {
             Connect with Pollinations
           </a>
 
+          {onGuest && (
+            <button
+              onClick={onGuest}
+              style={{
+                all: 'unset', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '100%', boxSizing: 'border-box',
+                marginTop: 12, padding: '14px',
+                borderRadius: 9999, fontWeight: 700, fontSize: 15,
+                color: PA.muted, border: `1.5px solid ${PA.hairline2}`,
+                background: '#fff',
+              }}
+            >
+              Continue as Guest
+            </button>
+          )}
+
           <div style={{ textAlign: 'center', color: PA.muted, fontSize: 12.5, marginTop: 16, lineHeight: 1.5 }}>
             You'll be redirected to Pollinations to approve access.<br />
             The key expires in 30 days and can be revoked anytime.
           </div>
+
+          {onGuest && (
+            <div style={{ textAlign: 'center', color: PA.mutedSoft, fontSize: 11.5, marginTop: 8, lineHeight: 1.5 }}>
+              Guest mode: browse and import trips. Creating new trips requires a Pollinations account.
+            </div>
+          )}
         </div>
       </div>
     </div>

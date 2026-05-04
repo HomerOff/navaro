@@ -26,7 +26,7 @@ function makeMarker(n, color, size, label = null, selected = false) {
   });
 }
 
-function makeDayPill(day, km, color) {
+function makeDayPill(day, color) {
   return L.divIcon({
     className: 'pathly-daypill',
     html: `<div style="
@@ -35,9 +35,9 @@ function makeDayPill(day, km, color) {
       font-family:'Plus Jakarta Sans',system-ui,sans-serif;
       font-weight:700;font-size:13px;white-space:nowrap;
       box-shadow:0 6px 14px rgba(0,0,0,.16);
-    ">Day ${day} · ${km} km</div>`,
-    iconSize: [120, 30],
-    iconAnchor: [60, 15],
+    ">Day ${day}</div>`,
+    iconSize: [80, 30],
+    iconAnchor: [40, 15],
   });
 }
 
@@ -60,6 +60,7 @@ export function PathlyMap({
   route = [],
   dayPills = [],
   interactive = false,
+  autoFit = false,
   onMarkerClick,
   selectedIdx = null,
   style,
@@ -99,13 +100,16 @@ export function PathlyMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Update center/zoom when they change ───────────────────────
+  // ── Update center/zoom when they change (skip when autoFit handles it) ───────
+  const [lat, lng] = center;
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || autoFit) return;
     mapRef.current.setView(center, zoom, { animate: true, duration: 0.5 });
-  }, [center[0], center[1], zoom]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lat, lng, zoom, autoFit]);
 
   // ── Redraw routes ─────────────────────────────────────────────
+  const routeKey = JSON.stringify(route);
   useEffect(() => {
     if (!mapRef.current) return;
     polylinesRef.current.forEach(p => p.remove());
@@ -123,9 +127,11 @@ export function PathlyMap({
       }).addTo(mapRef.current);
       polylinesRef.current.push(pl);
     });
-  }, [JSON.stringify(route)]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeKey]);
 
   // ── Redraw markers ────────────────────────────────────────────
+  const spotsKey = JSON.stringify(spots);
   useEffect(() => {
     if (!mapRef.current) return;
     markersRef.current.forEach(m => m.remove());
@@ -141,9 +147,20 @@ export function PathlyMap({
       if (onMarkerClick) marker.on('click', () => onMarkerClick(i));
       markersRef.current.push(marker);
     });
-  }, [JSON.stringify(spots), selectedIdx, onMarkerClick]);
+
+    if (autoFit && spots.length > 0) {
+      const coords = spots.filter(s => s.coord).map(s => s.coord);
+      if (coords.length === 1) {
+        mapRef.current.setView(coords[0], 15, { animate: true, duration: 0.5 });
+      } else if (coords.length > 1) {
+        mapRef.current.fitBounds(L.latLngBounds(coords), { padding: [48, 48], maxZoom: 16, animate: true, duration: 0.5 });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spotsKey, selectedIdx, onMarkerClick, autoFit]);
 
   // ── Redraw day pills ──────────────────────────────────────────
+  const dayPillsKey = JSON.stringify(dayPills);
   useEffect(() => {
     if (!mapRef.current) return;
     pillsRef.current.forEach(p => p.remove());
@@ -151,12 +168,13 @@ export function PathlyMap({
 
     dayPills.forEach(p => {
       const pill = L.marker(p.at, {
-        icon: makeDayPill(p.day, p.km, p.color),
+        icon: makeDayPill(p.day, p.color),
         zIndexOffset: 800,
       }).addTo(mapRef.current);
       pillsRef.current.push(pill);
     });
-  }, [JSON.stringify(dayPills)]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dayPillsKey]);
 
   // ── Pan to selected spot ──────────────────────────────────────
   useEffect(() => {
@@ -165,6 +183,7 @@ export function PathlyMap({
     if (sp?.coord) {
       mapRef.current.panTo(sp.coord, { animate: true, duration: 0.4 });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedIdx]);
 
   return (

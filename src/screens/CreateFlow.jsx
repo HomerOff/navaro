@@ -6,42 +6,86 @@ import { useState, useEffect, useRef } from 'react';
 import { PA } from '../tokens.js';
 import { Ic } from '../icons.jsx';
 import { PathlyBg } from '../components/ui/PathlyBg.jsx';
-import { Card, CircBtn, Spinner } from '../components/ui/atoms.jsx';
-import { TRENDING } from '../data/static.js';
+import { Card, CircBtn, Spinner } from '../components/ui/atoms.jsx';import { TRENDING } from '../data/static.js';
 import { generateTripAI } from '../services/ai.js';
 
 /* ════════════════════════════════════════
    STEP 1: WHERE
 ════════════════════════════════════════ */
 export function CreateWhere({ prefill = '', onNext, onClose }) {
-  const [query, setQuery] = useState(prefill);
-  const inputRef = useRef(null);
+  const [query, setQuery]           = useState(prefill);
+  const [suggestions, setSuggestions] = useState([]); // Nominatim results
+  const [loadingSug, setLoadingSug] = useState(false);
+  const inputRef  = useRef(null);
+  const debounceRef = useRef(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
+  // Nominatim autocomplete
+  useEffect(() => {
+    const q = query.trim();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (q.length < 2) { setSuggestions([]); return; }
+
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setLoadingSug(true);
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=6&featuretype=city`;
+        const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+        const data = await res.json();
+        // Filter to cities/towns/villages only
+        const cities = data
+          .filter(r => ['city','town','village','municipality'].includes(r.addresstype) || r.type === 'city')
+          .map(r => ({
+            city:    r.address.city || r.address.town || r.address.village || r.name,
+            country: r.address.country || '',
+            flag:    countryFlag(r.address.country_code?.toUpperCase()),
+            display: r.display_name,
+          }))
+          .filter((r, i, arr) => r.city && arr.findIndex(x => x.city === r.city && x.country === r.country) === i)
+          .slice(0, 5);
+        setSuggestions(cities);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setLoadingSug(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(debounceRef.current);
+  }, [query]);
+
   const q = query.trim().toLowerCase();
-  const filtered = q.length
+  const trendingFiltered = q.length
     ? TRENDING.filter(t => t.city.toLowerCase().includes(q) || t.country.toLowerCase().includes(q))
     : TRENDING;
 
   const choose = (city, country, flag) => onNext({ city: `${city}, ${country}`, flag });
-
-  // Custom destination when query doesn't match any trending city
-  const hasExactMatch = filtered.some(t => t.city.toLowerCase() === q);
-  const showCustom = q.length >= 2 && !hasExactMatch;
+  const hasExactMatch = suggestions.some(s => s.city.toLowerCase() === q) ||
+    trendingFiltered.some(t => t.city.toLowerCase() === q);
+  const showCustom = q.length >= 2 && !hasExactMatch && suggestions.length === 0 && !loadingSug;
 
   return (
-    <div style={{ minHeight: '100%', fontFamily: PA.font, color: PA.ink, position: 'relative' }} className="anim-slideUp">
+    <div style={{ minHeight: '100dvh', fontFamily: PA.font, color: PA.ink, position: 'relative' }} className="anim-slideUp">
       <PathlyBg tone="mint" />
-      <div style={{ position: 'relative', zIndex: 1, padding: '60px 18px 32px' }}>
 
-        {/* Top bar */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', height: 44, marginBottom: 22 }}>
-          <div style={{ fontWeight: 700, fontSize: 18 }}>Create Trip</div>
-          <div style={{ position: 'absolute', right: 0 }}>
-            <CircBtn size={38} onClick={onClose}><Ic.close size={18} /></CircBtn>
-          </div>
+      {/* Sticky top bar */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 20,
+        padding: 'max(16px,env(safe-area-inset-top)) 18px 12px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(234,242,221,0.85)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+      }}>
+        <div style={{ fontWeight: 700, fontSize: 18 }}>Create Trip</div>
+        <div style={{ position: 'absolute', right: 18 }}>
+          <CircBtn size={38} onClick={onClose}><Ic.close size={18} /></CircBtn>
         </div>
+      </div>
+
+      <div style={{ position: 'relative', zIndex: 1, padding: '0 18px 32px' }}>
 
         <Card padding={20} style={{ marginBottom: 14 }}>
           <div style={{ fontWeight: 700, fontSize: 17, letterSpacing: '-.01em', marginBottom: 14 }}>Where?</div>
@@ -49,7 +93,7 @@ export function CreateWhere({ prefill = '', onNext, onClose }) {
           {/* Search input */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 10,
-            padding: '12px 14px', borderRadius: 14, background: '#F4F5F2', marginBottom: 14,
+            padding: '12px 14px', borderRadius: 14, background: '#F4F5F2', marginBottom: 10,
           }}>
             <Ic.search size={18} color={PA.muted} />
             <input
@@ -61,18 +105,50 @@ export function CreateWhere({ prefill = '', onNext, onClose }) {
                   onNext({ city: query.trim(), flag: '🌍' });
                 }
               }}
-              placeholder="Search any destination..."
+              placeholder="Search any city…"
               style={{
                 flex: 1, border: 'none', background: 'transparent',
                 fontSize: 15, color: PA.ink, outline: 'none',
               }}
             />
-            {query && (
-              <button onClick={() => setQuery('')} style={{ all: 'unset', cursor: 'pointer' }}>
+            {loadingSug && <Spinner size={16} />}
+            {query && !loadingSug && (
+              <button onClick={() => { setQuery(''); setSuggestions([]); }} style={{ all: 'unset', cursor: 'pointer' }}>
                 <Ic.close size={16} color={PA.muted} />
               </button>
             )}
           </div>
+
+          {/* Nominatim suggestions */}
+          {suggestions.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: PA.muted, fontSize: 12, fontWeight: 600, marginBottom: 8 }}>
+                <Ic.search size={12} color={PA.muted} /> Search results
+              </div>
+              {suggestions.map((s, i) => (
+                <button
+                  key={i}
+                  onClick={() => choose(s.city, s.country, s.flag)}
+                  style={{
+                    all: 'unset', width: '100%', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '10px 0',
+                    borderTop: i > 0 ? `1px solid ${PA.hairline}` : 'none',
+                  }}
+                >
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 9, background: PA.blueSoft,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+                  }}>{s.flag}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>{s.city}</div>
+                    <div style={{ color: PA.muted, fontSize: 13 }}>{s.country}</div>
+                  </div>
+                  <Ic.chevR size={16} color={PA.mutedSoft} />
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Custom destination CTA */}
           {showCustom && (
@@ -82,8 +158,7 @@ export function CreateWhere({ prefill = '', onNext, onClose }) {
                 all: 'unset', width: '100%', cursor: 'pointer', boxSizing: 'border-box',
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '12px 14px', borderRadius: 14,
-                background: PA.blueSoft,
-                border: `1.5px solid ${PA.blue}55`,
+                background: PA.blueSoft, border: `1.5px solid ${PA.blue}55`,
                 marginBottom: 14,
               }}
             >
@@ -99,45 +174,52 @@ export function CreateWhere({ prefill = '', onNext, onClose }) {
             </button>
           )}
 
-          {/* List label */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: PA.muted, fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
-            <Ic.fire size={14} color={PA.muted} />
-            {q ? 'Matching destinations' : 'Trending destinations'}
-          </div>
-
-          {/* Destination list */}
-          {filtered.map((t, i) => (
-            <button
-              key={i}
-              onClick={() => choose(t.city, t.country, t.flag)}
-              style={{
-                all: 'unset', width: '100%', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '10px 0',
-                borderTop: i > 0 ? `1px solid ${PA.hairline}` : 'none',
-              }}
-            >
-              <div style={{
-                width: 36, height: 36, borderRadius: 9, background: '#F4F5F2',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
-              }}>{t.flag}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 15 }}>{t.city}</div>
-                <div style={{ color: PA.muted, fontSize: 13 }}>{t.country}</div>
+          {/* Trending */}
+          {suggestions.length === 0 && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: PA.muted, fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
+                <Ic.fire size={14} color={PA.muted} />
+                {q ? 'Matching destinations' : 'Trending destinations'}
               </div>
-              <Ic.chevR size={16} color={PA.mutedSoft} />
-            </button>
-          ))}
-
-          {filtered.length === 0 && !showCustom && (
-            <div style={{ textAlign: 'center', color: PA.muted, fontSize: 14, padding: '16px 0' }}>
-              No matching cities. Type any destination above.
-            </div>
+              {trendingFiltered.map((t, i) => (
+                <button
+                  key={i}
+                  onClick={() => choose(t.city, t.country, t.flag)}
+                  style={{
+                    all: 'unset', width: '100%', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '10px 0',
+                    borderTop: i > 0 ? `1px solid ${PA.hairline}` : 'none',
+                  }}
+                >
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 9, background: '#F4F5F2',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+                  }}>{t.flag}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>{t.city}</div>
+                    <div style={{ color: PA.muted, fontSize: 13 }}>{t.country}</div>
+                  </div>
+                  <Ic.chevR size={16} color={PA.mutedSoft} />
+                </button>
+              ))}
+              {trendingFiltered.length === 0 && !showCustom && (
+                <div style={{ textAlign: 'center', color: PA.muted, fontSize: 14, padding: '16px 0' }}>
+                  No matching cities. Type any destination above.
+                </div>
+              )}
+            </>
           )}
         </Card>
       </div>
     </div>
   );
+}
+
+/* ── Country code → flag emoji ── */
+function countryFlag(code) {
+  if (!code || code.length !== 2) return '🌍';
+  return String.fromCodePoint(...[...code].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
 }
 
 /* ════════════════════════════════════════
@@ -152,32 +234,46 @@ export function CreateWhen({ city, flag, onBack, onClose, onNext }) {
   const today = new Date().toISOString().split('T')[0];
 
   const computedDays = (() => {
-    if (mode === 'dates' && startDate && endDate) {
-      const diff = Math.round((new Date(endDate) - new Date(startDate)) / 86400000);
-      return Math.max(1, Math.min(14, diff + 1));
+    if (mode === 'dates' && startDate) {
+      if (endDate && endDate >= startDate) {
+        const diff = Math.round((new Date(endDate) - new Date(startDate)) / 86400000);
+        return Math.max(1, Math.min(14, diff + 1));
+      }
+      return 1; // single day
     }
     return numDays;
   })();
 
-  const canProceed = mode === 'days' || (startDate && endDate && endDate >= startDate);
+  const canProceed = mode === 'days' || startDate.length > 0;
 
   const handleNext = () => {
-    onNext({ days: computedDays, dateRange: mode === 'dates' ? { start: startDate, end: endDate } : null });
+    onNext({
+      days: computedDays,
+      dateRange: mode === 'dates' && startDate
+        ? { start: startDate, end: endDate || startDate }
+        : null,
+    });
   };
 
   return (
-    <div style={{ minHeight: '100%', fontFamily: PA.font, color: PA.ink, position: 'relative' }} className="anim-slideUp">
+    <div style={{ minHeight: '100dvh', fontFamily: PA.font, color: PA.ink, position: 'relative' }} className="anim-slideUp">
       <PathlyBg tone="mint" />
-      <div style={{ position: 'relative', zIndex: 1, padding: '60px 18px 32px' }}>
 
-        {/* Top bar */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 44, marginBottom: 22 }}>
-          <CircBtn size={38} onClick={onBack}><Ic.back size={18} /></CircBtn>
-          <div style={{ fontWeight: 700, fontSize: 18 }}>Create Trip</div>
-          <CircBtn size={38} onClick={onClose}><Ic.close size={18} /></CircBtn>
-        </div>
+      {/* Sticky top bar */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 20,
+        padding: 'max(16px,env(safe-area-inset-top)) 18px 12px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: 'rgba(234,242,221,0.85)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+      }}>
+        <CircBtn size={38} onClick={onBack}><Ic.back size={18} /></CircBtn>
+        <div style={{ fontWeight: 700, fontSize: 18 }}>Create Trip</div>
+        <CircBtn size={38} onClick={onClose}><Ic.close size={18} /></CircBtn>
+      </div>
 
-        {/* Where summary */}
+      <div style={{ position: 'relative', zIndex: 1, padding: '0 18px 32px' }}>
         <Card padding={16} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <div style={{ fontWeight: 700, fontSize: 15.5 }}>Where</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -272,13 +368,13 @@ export function CreateWhen({ city, flag, onBack, onClose, onNext }) {
                       width: '100%', boxSizing: 'border-box',
                       padding: '13px 14px', borderRadius: 14,
                       border: `1.5px solid ${startDate ? PA.blue : PA.hairline2}`,
-                      fontSize: 15, fontFamily: PA.font, color: PA.ink,
+                      fontSize: 16, fontFamily: PA.font, color: PA.ink,
                       outline: 'none', background: '#fff',
                     }}
                   />
                 </div>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: PA.muted, marginBottom: 6 }}>End date</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: PA.muted, marginBottom: 6 }}>End date <span style={{ fontWeight: 400 }}>(optional)</span></div>
                   <input
                     type="date"
                     min={startDate || today}
@@ -288,20 +384,20 @@ export function CreateWhen({ city, flag, onBack, onClose, onNext }) {
                       width: '100%', boxSizing: 'border-box',
                       padding: '13px 14px', borderRadius: 14,
                       border: `1.5px solid ${endDate ? PA.blue : PA.hairline2}`,
-                      fontSize: 15, fontFamily: PA.font, color: PA.ink,
+                      fontSize: 16, fontFamily: PA.font, color: PA.ink,
                       outline: 'none', background: '#fff',
                     }}
                   />
                 </div>
               </div>
 
-              {computedDays > 1 && startDate && endDate && (
+              {startDate && (
                 <div style={{
                   marginTop: 14, padding: '10px 14px', borderRadius: 12,
                   background: PA.blueSoft, color: PA.blueDeep,
                   fontWeight: 700, fontSize: 14, textAlign: 'center',
                 }}>
-                  {computedDays} days selected
+                  {computedDays === 1 ? '1 day selected' : `${computedDays} days selected`}
                 </div>
               )}
             </>
@@ -356,24 +452,31 @@ const INTERESTS = [
 
 export function CreateInterests({ city, flag, days, onBack, onClose, onBuild }) {
   const [selected, setSelected] = useState([]);
+  const [wishes, setWishes]     = useState('');
 
   const toggle = id => setSelected(s =>
     s.includes(id) ? s.filter(x => x !== id) : [...s, id]
   );
 
   return (
-    <div style={{ minHeight: '100%', fontFamily: PA.font, color: PA.ink, position: 'relative' }} className="anim-slideUp">
+    <div style={{ minHeight: '100dvh', fontFamily: PA.font, color: PA.ink, position: 'relative' }} className="anim-slideUp">
       <PathlyBg tone="mint" />
-      <div style={{ position: 'relative', zIndex: 1, padding: '60px 18px 32px' }}>
 
-        {/* Top bar */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 44, marginBottom: 22 }}>
-          <CircBtn size={38} onClick={onBack}><Ic.back size={18} /></CircBtn>
-          <div style={{ fontWeight: 700, fontSize: 18 }}>Create Trip</div>
-          <CircBtn size={38} onClick={onClose}><Ic.close size={18} /></CircBtn>
-        </div>
+      {/* Sticky top bar */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 20,
+        padding: 'max(16px,env(safe-area-inset-top)) 18px 12px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: 'rgba(234,242,221,0.85)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+      }}>
+        <CircBtn size={38} onClick={onBack}><Ic.back size={18} /></CircBtn>
+        <div style={{ fontWeight: 700, fontSize: 18 }}>Create Trip</div>
+        <CircBtn size={38} onClick={onClose}><Ic.close size={18} /></CircBtn>
+      </div>
 
-        {/* Summary card */}
+      <div style={{ position: 'relative', zIndex: 1, padding: '0 18px 32px' }}>
         <Card padding={16} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: 15 }}>{city.split(',')[0]}</div>
@@ -422,6 +525,27 @@ export function CreateInterests({ city, flag, days, onBack, onClose, onBuild }) 
               ✓ {selected.length} interest{selected.length > 1 ? 's' : ''} selected
             </div>
           )}
+
+          {/* Additional wishes */}
+          <div style={{ marginTop: 18 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, color: PA.ink }}>
+              Any specific wishes? <span style={{ color: PA.muted, fontWeight: 500 }}>(optional)</span>
+            </div>
+            <textarea
+              value={wishes}
+              onChange={e => setWishes(e.target.value)}
+              placeholder="e.g. Avoid tourist traps, include rooftop bars, end near the beach…"
+              rows={3}
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                padding: '12px 14px', borderRadius: 14, resize: 'none',
+                border: `1.5px solid ${wishes ? PA.blue : PA.hairline2}`,
+                fontSize: 14, fontFamily: PA.font, color: PA.ink,
+                outline: 'none', background: '#fff',
+                transition: 'border-color .15s',
+              }}
+            />
+          </div>
         </Card>
 
         {/* CTA */}
@@ -435,7 +559,10 @@ export function CreateInterests({ city, flag, days, onBack, onClose, onBuild }) 
             }}
           >Back</button>
           <button
-            onClick={() => onBuild(selected.map(id => INTERESTS.find(i => i.id === id)?.label).filter(Boolean))}
+            onClick={() => onBuild(
+              selected.map(id => INTERESTS.find(i => i.id === id)?.label).filter(Boolean),
+              wishes.trim()
+            )}
             style={{
               flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               padding: '14px', borderRadius: 9999, fontWeight: 700, fontSize: 15,
@@ -463,7 +590,7 @@ const STEP_DEFS = [
   { icon: 'check',   label: 'Finishing up',                  sub: 'Almost ready!'              },
 ];
 
-export function BuildingScreen({ city, days, interests = [], onDone, onError }) {
+export function BuildingScreen({ city, days, interests = [], wishes = '', onDone, onError }) {
   const [activeStep, setActiveStep] = useState(0);
   const abortRef = useRef(null);
 
@@ -473,7 +600,7 @@ export function BuildingScreen({ city, days, interests = [], onDone, onError }) 
 
     abortRef.current = new AbortController();
 
-    generateTripAI(city, days, interests, abortRef.current.signal)
+    generateTripAI(city, days, interests, wishes, abortRef.current.signal)
       .then(trip => {
         setActiveStep(STEP_DEFS.length);
         setTimeout(() => onDone(trip), 500);
@@ -488,6 +615,7 @@ export function BuildingScreen({ city, days, interests = [], onDone, onError }) 
       timers.forEach(clearTimeout);
       abortRef.current?.abort();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

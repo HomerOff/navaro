@@ -1,7 +1,13 @@
 const KEY        = 'navaro-trips-v1';
-const FAV_KEY    = 'navaro-favorites';       // favorite trip IDs
-const FAV_SPOTS  = 'navaro-fav-spots';       // favorite spot objects
+const FAV_KEY    = 'navaro-favorites';
+const FAV_SPOTS  = 'navaro-fav-spots';
 const TOKEN_KEY  = 'navaro-api-token';
+const SETTINGS_KEY = 'navaro-settings';
+
+const DEFAULT_SETTINGS = {
+  tripModel:       'openai-large',
+  useGeminiImages: true,
+};
 
 export const storage = {
   // ── Trips ──────────────────────────────────────────────────────
@@ -74,5 +80,21 @@ export const storage = {
   setToken(token) {
     if (token) localStorage.setItem(TOKEN_KEY, token.trim());
     else localStorage.removeItem(TOKEN_KEY);
+  },
+
+  // ── Settings ───────────────────────────────────────────────────
+  getSettings() {
+    try { return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}') }; }
+    catch { return { ...DEFAULT_SETTINGS }; }
+  },
+  saveSettings(patch) {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...this.getSettings(), ...patch }));
+  },
+
+  // ── Clear all user data ────────────────────────────────────────
+  clearAll() {
+    localStorage.removeItem(KEY);
+    localStorage.removeItem(FAV_KEY);
+    localStorage.removeItem(FAV_SPOTS);
   },
 };
