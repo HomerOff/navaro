@@ -287,7 +287,7 @@ function OptimizeModal({ trip, day, onDone, onClose }) {
             width: '100%', boxSizing: 'border-box',
             padding: '13px 14px', borderRadius: 14, resize: 'none',
             border: `1.5px solid ${wishes ? PA.blue : PA.hairline2}`,
-            fontSize: 15, fontFamily: PA.font, color: PA.ink,
+            fontSize: 16, fontFamily: PA.font, color: PA.ink,
             outline: 'none', background: '#fff', marginBottom: 14,
           }}
         />

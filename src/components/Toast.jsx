@@ -26,7 +26,7 @@ export function Toast({ message, type = 'error', onClose, duration = 4500 }) {
         zIndex: 9999,
         boxShadow: '0 8px 32px rgba(0,0,0,.28)',
         display: 'flex', alignItems: 'center', gap: 10,
-        maxWidth: 340, width: 'max-content',
+        maxWidth: 'min(340px, calc(100vw - 32px))', width: 'max-content',
         borderLeft: `3px solid ${c.accent}`,
       }}
     >

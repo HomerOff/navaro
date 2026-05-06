@@ -108,7 +108,7 @@ export function CreateWhere({ prefill = '', onNext, onClose }) {
               placeholder="Search any city…"
               style={{
                 flex: 1, border: 'none', background: 'transparent',
-                fontSize: 15, color: PA.ink, outline: 'none',
+                fontSize: 16, color: PA.ink, outline: 'none',
               }}
             />
             {loadingSug && <Spinner size={16} />}
