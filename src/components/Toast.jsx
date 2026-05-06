@@ -19,14 +19,14 @@ export function Toast({ message, type = 'error', onClose, duration = 4500 }) {
     <div
       className="anim-slideUp"
       style={{
-        position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)',
+        position: 'fixed', bottom: 90, left: 16, right: 16, margin: '0 auto',
         background: c.bg, color: '#fff',
         padding: '12px 18px 12px 14px',
         borderRadius: 14, fontWeight: 600, fontSize: 14,
         zIndex: 9999,
         boxShadow: '0 8px 32px rgba(0,0,0,.28)',
         display: 'flex', alignItems: 'center', gap: 10,
-        maxWidth: 'min(340px, calc(100vw - 32px))', width: 'max-content',
+        maxWidth: 340, width: 'auto',
         borderLeft: `3px solid ${c.accent}`,
       }}
     >
